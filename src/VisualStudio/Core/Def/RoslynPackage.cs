@@ -10,10 +10,12 @@ using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.ErrorReporting;
+using Microsoft.CodeAnalysis.Utilities;
 using Microsoft.CodeAnalysis.Versions;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices.Implementation;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Library.FindResults;
+using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.RuleSets;
 using Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource;
 using Microsoft.VisualStudio.LanguageServices.Utilities;
@@ -21,6 +23,7 @@ using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Task = System.Threading.Tasks.Task;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Interactive;
 
 namespace Microsoft.VisualStudio.LanguageServices.Setup
 {
@@ -41,8 +44,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
         {
             base.Initialize();
 
-            ForegroundThreadAffinitizedObject.DefaultForegroundThreadData = ForegroundThreadData.CreateDefault();
-            Debug.Assert(ForegroundThreadAffinitizedObject.DefaultForegroundThreadData.Kind == ForegroundThreadDataKind.Wpf);
+            ForegroundThreadAffinitizedObject.CurrentForegroundThreadData = ForegroundThreadData.CreateDefault();
+            Debug.Assert(
+                ForegroundThreadAffinitizedObject.CurrentForegroundThreadData.Kind == ForegroundThreadDataKind.Wpf ||
+                ForegroundThreadAffinitizedObject.CurrentForegroundThreadData.Kind == ForegroundThreadDataKind.JoinableTask);
 
             FatalError.Handler = FailFast.OnFatalException;
             FatalError.NonFatalHandler = WatsonReporter.Report;
@@ -151,6 +156,10 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
             this.ComponentModel.GetService<VisualStudioMetadataAsSourceFileSupportService>();
             this.ComponentModel.GetService<VirtualMemoryNotificationListener>();
 
+            // The misc files workspace needs to be loaded on the UI thread.  This way it will have
+            // the appropriate task scheduler to report events on.
+            this.ComponentModel.GetService<MiscellaneousFilesWorkspace>();
+
             LoadAnalyzerNodeComponents();
 
             Task.Run(() => LoadComponentsBackground());
@@ -161,9 +170,22 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
             // Perf: Initialize the command handlers.
             var commandHandlerServiceFactory = this.ComponentModel.GetService<ICommandHandlerServiceFactory>();
             commandHandlerServiceFactory.Initialize(ContentTypeNames.RoslynContentType);
+            LoadInteractiveMenus();
 
             this.ComponentModel.GetService<MiscellaneousTodoListTable>();
             this.ComponentModel.GetService<MiscellaneousDiagnosticListTable>();
+        }
+
+        private void LoadInteractiveMenus()
+        {
+            var menuCommandService = (OleMenuCommandService)GetService(typeof(IMenuCommandService));
+            var monitorSelectionService = (IVsMonitorSelection)this.GetService(typeof(SVsShellMonitorSelection));
+
+            new CSharpResetInteractiveMenuCommand(menuCommandService, monitorSelectionService, ComponentModel)
+                .InitializeResetInteractiveFromProjectCommand();
+
+            new VisualBasicResetInteractiveMenuCommand(menuCommandService, monitorSelectionService, ComponentModel)
+                .InitializeResetInteractiveFromProjectCommand();
         }
 
         internal IComponentModel ComponentModel

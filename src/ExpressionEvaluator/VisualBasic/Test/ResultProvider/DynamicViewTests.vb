@@ -6,9 +6,10 @@ Imports System.Dynamic
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation
+Imports Roslyn.Test.Utilities
 Imports Xunit
 
-Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
+Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator.UnitTests
 
     Public Class DynamicViewTests : Inherits VisualBasicResultProviderTestBase
 
@@ -113,7 +114,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Next
         End Sub
 
-        <Fact>
+        <ConditionalFact(GetType(IsEnglishLocal))>
+        <WorkItem(5667, "https://github.com/dotnet/roslyn/issues/5667")>
         Public Sub NoMembers()
             Dim expression = "o"
             Dim o As Object = New ExpandoObject()

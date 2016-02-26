@@ -208,7 +208,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
                 {
                     // TakeNextPreviewAsync() needs to run on UI thread.
                     AssertIsForeground();
-                    return await previewResult.TakeNextPreviewAsync(preferredDocumentId, preferredProjectId, cancellationToken).ConfigureAwait(true);
+                    return await previewResult.GetPreviewsAsync(preferredDocumentId, preferredProjectId, cancellationToken).ConfigureAwait(true);
                 }
 
                 // GetPreviewPane() below needs to run on UI thread. We use ConfigureAwait(true) to stay on the UI thread.
@@ -259,14 +259,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
         // same as display text
         string ISuggestedAction.IconAutomationText => DisplayText;
 
-        ImageMoniker ISuggestedAction.IconMoniker
-        {
-            get
-            {
-                // no icon support
-                return default(ImageMoniker);
-            }
-        }
+        ImageMoniker ISuggestedAction.IconMoniker => CodeAction.Glyph.HasValue
+            ? ((Glyph)CodeAction.Glyph.Value).GetImageMoniker()
+            : default(ImageMoniker);
 
         string ISuggestedAction.InputGestureText
         {
